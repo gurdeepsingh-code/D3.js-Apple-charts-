@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <script
+      src="https://cdnjs.cloudflare.com/ajax/libs/d3/4.2.8/d3.min.js"
+      type="text/JavaScript"
+    ></script>
+    <!--    include the below script  -->
+    <script src="https://d3js.org/d3-geo-projection.v1.min.js"></script>
+    <script src="js/colorbrewer.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+      path.countries {
+        stroke-width: 1;
+        stroke: #75739f;
+        fill: #5eafc6;
+      }
+      circle.cities {
+        stroke-width: 1;
+        stroke: #4f442b;
+        fill: #fcbc34;
+      }
+      circle.centroid {
+        fill: #75739f;
+        pointer-events: none;
+      }
+      rect.bbox {
+        fill: none;
+        stroke-dasharray: 5 5;
+        stroke: #75739f;
+        stroke-width: 2;
+        pointer-events: none;
+      }
+      path.graticule {
+        fill: none;
+        stroke-width: 1;
+        stroke: #9a8b7a;
+      }
+      path.graticule.outline {
+        stroke: #9a8b7a;
+      }
+
+      path.merged {
+        fill: #9a8b7a;
+        stroke: #4f442b;
+        stroke-width: 2px;
+      }
+    </style>
+  </head>
+  <body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+      <div class="container-fluid">
+        <a class="navbar-brand" href="map.html">Final Project</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+          <ul class="navbar-nav">
+            <li class="nav-item">
+              <a class="nav-link active" href="map.html">Apple (Stores,Production,Area) Countries Map</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="pieChart.html">Apple Sales Volume</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="barGraph.html">Apple Number of Users</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="lineChart.html">iOS Version MarketShare</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+    <div id="controls"></div>
+    <div class="container mt-5">
+      <div class="row">
+        <div class="col-md-3"><button name="locationButton" class="btn btn-secondary" onclick="fullMap()">Full Map</button></div>
+        <div class="col-md-3"><button name="areaHarvestedForAppleButton" class="btn btn-primary" onclick="areaHarvestedForApple()">Area harvested for apples</button></div>
+        <div class="col-md-3"><button name="productionCountriesButton" class="btn btn-danger" onclick="productionCountries()">Production Countries</button></div>
+        <div class="col-md-3"><button name="StoresButton" class="btn btn-success" onclick="Stores()">Stores</button></div>
+      </div>
+    </div>
+    <div id="viz">
+      <div class="container">
+        <div class="row">
+          <svg style="width: 100%; height: 500px;"></svg>
+        </div>
+      </div>
+    </div>
+    <div class="container text-center">
+      Reference: <a href="https://en.wikipedia.org/wiki/Apple_Store">https://en.wikipedia.org/wiki/Apple_Store</a>, <a href="https://en.wikipedia.org/wiki/List_of_countries_by_apple_production">https://en.wikipedia.org/wiki/List_of_countries_by_apple_production</a>
+    </div>
+    <script>
+
+      var worldproductionCountries = [];
+      var worldareaHarvestedForApple = [];
+      var worldStores = [];
+
+      // loading the daya with promise
+      var PromiseWrapper = (xhr, d) =>
+        new Promise((resolve) => xhr(d, (p) => resolve(p)));
+
+      Promise.all([
+        PromiseWrapper(d3.json, "data/map/world.geojson"),
+        PromiseWrapper(d3.csv, "data/map/apple.csv"),
+      ]).then((resolve) => {
+        createMap(resolve[0], resolve[1]);
+      });
+
+      function createMap(countries, world) {
+        
+
+        world.forEach(d => {
+          worldproductionCountries.push(d.productionCountries);
+          worldareaHarvestedForApple.push(d.areaHarvestedForApple);
+          worldStores.push(d.Stores);
+        });
+
+        var aProjection = d3.geoMollweide().scale(120).translate([450, 250]);
+
+        var geoPath = d3.geoPath().projection(aProjection);
+        var featureSize = d3.extent(countries.features, (d) => geoPath.area(d));
+
+
+        var countryColor = d3
+          .scaleQuantize()
+          .domain(featureSize)
+          .range(colorbrewer.RdYlBu[7]);
+
+        d3.select("svg")
+          .selectAll("path")
+          .data(countries.features)
+          .enter()
+          .append("path")
+          .attr("d", geoPath)
+          .attr("class", "countries")
+          .style("fill", (d) => countryColor(geoPath.area(d)))
+          .style("stroke", (d) =>
+            d3.rgb(countryColor(geoPath.area(d))).darker()
+          );
+      }
+
+      function fullMap(){
+        clearColour();
+      }
+      function productionCountries(){
+        clearColour();
+        d3.selectAll("path.countries").filter((p,q) => worldproductionCountries.indexOf(p.properties.name) > -1).style("fill", "#52057b");
+      }
+      function areaHarvestedForApple(d,i){
+        clearColour();
+        d3.selectAll("path.countries").filter((p,q) => worldareaHarvestedForApple.indexOf(p.properties.name) > -1).style("fill", "#03c4a1");
+      }
+      function Stores(d,i){
+        clearColour();
+        d3.selectAll("path.countries").filter((p,q) => worldStores.indexOf(p.properties.name) > -1).style("fill", "#1aa6b7");
+      }
+
+      function clearColour () {
+          d3.selectAll("path.countries").style("fill", "#f2f2f2").style("stroke", "#ccc");
+        }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta1/dist/js/bootstrap.bundle.min.js"></script>
+  </body>
+</html>
